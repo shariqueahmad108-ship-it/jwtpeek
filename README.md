@@ -50,10 +50,16 @@ scripts/CI), `2` on a malformed token, and `0` otherwise.
 | `alg-none` | CRITICAL | `alg` is `none` — token is unsigned and forgeable if accepted |
 | `alg-missing` | MEDIUM | header has no `alg` |
 | `alg-symmetric` | INFO | HMAC (`HS*`) alg — watch for RS/HS key-confusion |
+| `header-jku` / `header-x5u` | HIGH | header points to a URL for the verification key — key injection / SSRF if trusted |
+| `header-jwk` | HIGH | header embeds a public key — forgeable if the server verifies against it |
+| `header-x5c` | MEDIUM | header embeds an X.509 cert chain — review whether it's trusted |
+| `header-kid` | LOW | `kid` is attacker-controlled — path-traversal / SQLi if used unsafely for key lookup |
 | `no-exp` | MEDIUM | no `exp` claim — token never expires |
 | `expired` | LOW | `exp` is in the past |
 | `long-lived` | LOW | `exp` is more than a year out |
 | `exp-not-numeric` | LOW | `exp` present but not a numeric timestamp |
+| `not-yet-valid` | LOW | `nbf` is in the future — token not valid yet |
+| `iat-future` | LOW | `iat` (issued-at) is in the future — clock skew or tampering |
 
 ## Library use
 

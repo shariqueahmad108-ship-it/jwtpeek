@@ -56,6 +56,40 @@ def test_symmetric_alg_is_info():
     assert codes.get("alg-symmetric") == "INFO"
 
 
+def test_flags_key_source_headers_as_high():
+    valid_exp = int(time.time()) + 3600
+    for param in ("jku", "x5u", "jwk"):
+        tok = _token({"alg": "RS256", param: "x"}, {"exp": valid_exp})
+        codes = {f.code: f.severity for f in inspect(tok).findings}
+        assert codes.get(f"header-{param}") == "HIGH", param
+
+
+def test_flags_x5c_as_medium():
+    tok = _token({"alg": "RS256", "x5c": ["cert"]}, {"exp": int(time.time()) + 3600})
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("header-x5c") == "MEDIUM"
+
+
+def test_flags_kid_header():
+    tok = _token({"alg": "RS256", "kid": "../../key"}, {"exp": int(time.time()) + 3600})
+    codes = {f.code for f in inspect(tok).findings}
+    assert "header-kid" in codes
+
+
+def test_flags_not_yet_valid_nbf():
+    now = 1_000_000
+    tok = _token({"alg": "RS256"}, {"exp": now + 3600, "nbf": now + 600})
+    codes = {f.code for f in inspect(tok, now=now).findings}
+    assert "not-yet-valid" in codes
+
+
+def test_flags_iat_in_future():
+    now = 1_000_000
+    tok = _token({"alg": "RS256"}, {"exp": now + 3600, "iat": now + 600})
+    codes = {f.code for f in inspect(tok, now=now).findings}
+    assert "iat-future" in codes
+
+
 def test_valid_rs256_token_has_no_findings():
     tok = _token({"alg": "RS256"}, {"sub": "1", "exp": int(time.time()) + 3600})
     assert inspect(tok).findings == []

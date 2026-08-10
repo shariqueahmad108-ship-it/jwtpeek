@@ -21,6 +21,15 @@ _SYMMETRIC_PREFIX = "HS"
 # A token valid for longer than this (seconds) is flagged as long-lived.
 LONG_LIVED_SECONDS = 365 * 24 * 3600  # 1 year
 
+# Header parameters that let a token influence which key verifies it. If the
+# server honours them, the token can often be forged (or coerced into an SSRF).
+_KEY_SOURCE_HEADERS = {
+    "jku": ("HIGH", "points to a URL the server may fetch a JWK Set from — key injection / SSRF if trusted."),
+    "x5u": ("HIGH", "points to a URL the server may fetch an X.509 cert from — key injection / SSRF if trusted."),
+    "jwk": ("HIGH", "embeds a public key the server may verify against — forgeable if trusted."),
+    "x5c": ("MEDIUM", "embeds an X.509 cert chain the server may verify against — review whether it is trusted."),
+}
+
 
 @dataclass
 class Finding:
@@ -103,6 +112,20 @@ def inspect(token: str, now: int | None = None) -> Inspection:
             )
         )
 
+    for param, (severity, detail) in _KEY_SOURCE_HEADERS.items():
+        if param in header:
+            findings.append(Finding(severity, f"header-{param}", f"Header '{param}' present: {detail}"))
+
+    if "kid" in header:
+        findings.append(
+            Finding(
+                "LOW",
+                "header-kid",
+                "Header 'kid' is attacker-controlled; if used to look up a key unsafely it can enable "
+                "path traversal or SQL injection.",
+            )
+        )
+
     if "exp" not in payload:
         findings.append(
             Finding("MEDIUM", "no-exp", "Payload has no 'exp' claim: the token never expires.")
@@ -123,5 +146,18 @@ def inspect(token: str, now: int | None = None) -> Inspection:
             findings.append(
                 Finding("LOW", "exp-not-numeric", "'exp' is present but not a numeric timestamp.")
             )
+
+    nbf = payload.get("nbf")
+    if isinstance(nbf, (int, float)) and not isinstance(nbf, bool) and nbf > now:
+        minutes = int((nbf - now) / 60)
+        findings.append(
+            Finding("LOW", "not-yet-valid", f"Token is not valid yet (nbf is ~{minutes} min in the future).")
+        )
+
+    iat = payload.get("iat")
+    if isinstance(iat, (int, float)) and not isinstance(iat, bool) and iat > now:
+        findings.append(
+            Finding("LOW", "iat-future", "'iat' (issued-at) is in the future — clock skew or a tampered timestamp.")
+        )
 
     return Inspection(header=header, payload=payload, findings=findings)
