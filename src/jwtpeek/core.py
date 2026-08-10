@@ -86,6 +86,16 @@ def inspect(token: str, now: int | None = None) -> Inspection:
     payload = decode_segment(parts[1])
     findings: list[Finding] = []
 
+    if parts[2] == "":
+        findings.append(
+            Finding(
+                "HIGH",
+                "empty-signature",
+                "The signature segment is empty: the token is effectively unsigned and forgeable if "
+                "the server does not enforce a signature.",
+            )
+        )
+
     alg = str(header.get("alg", "")).strip()
     if alg.lower() in _NONE_ALGS:
         findings.append(

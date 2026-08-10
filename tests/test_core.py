@@ -23,6 +23,12 @@ def test_decodes_header_and_payload():
     assert result.payload["sub"] == "1"
 
 
+def test_flags_empty_signature():
+    tok = f"{_seg({'alg': 'HS256'})}.{_seg({'sub': '1', 'exp': int(time.time()) + 3600})}."
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("empty-signature") == "HIGH"
+
+
 def test_flags_alg_none_as_critical():
     # 'None', 'none', 'NONE' should all trip the unsigned-token finding.
     for alg in ("none", "None", "NONE"):

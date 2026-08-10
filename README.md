@@ -48,6 +48,7 @@ scripts/CI), `2` on a malformed token, and `0` otherwise.
 | Code | Severity | Meaning |
 |---|---|---|
 | `alg-none` | CRITICAL | `alg` is `none` — token is unsigned and forgeable if accepted |
+| `empty-signature` | HIGH | signature segment is empty — token is effectively unsigned |
 | `alg-missing` | MEDIUM | header has no `alg` |
 | `alg-symmetric` | INFO | HMAC (`HS*`) alg — watch for RS/HS key-confusion |
 | `header-jku` / `header-x5u` | HIGH | header points to a URL for the verification key — key injection / SSRF if trusted |
