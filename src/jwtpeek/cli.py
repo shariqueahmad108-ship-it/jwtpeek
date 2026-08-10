@@ -14,12 +14,21 @@ def main(argv: list[str] | None = None) -> int:
         prog="jwtpeek",
         description="Decode and security-inspect a JWT without verifying its signature.",
     )
-    parser.add_argument("token", help="the JWT to inspect (header.payload.signature)")
+    parser.add_argument(
+        "token", help="the JWT to inspect (header.payload.signature), or '-' to read it from stdin"
+    )
     parser.add_argument("--json", action="store_true", help="output machine-readable JSON")
     args = parser.parse_args(argv)
 
+    token = args.token
+    if token == "-":
+        token = sys.stdin.read().strip()
+        if not token:
+            print("error: no token provided on stdin", file=sys.stderr)
+            return 2
+
     try:
-        result = inspect(args.token)
+        result = inspect(token)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
