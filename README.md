@@ -8,6 +8,7 @@ token is built* — before you ever trust its contents.
 
 > It never validates signatures. Treat every field it prints as attacker-controlled.
 
+[![CI](https://github.com/shariqueahmad108-ship-it/jwtpeek/actions/workflows/ci.yml/badge.svg)](https://github.com/shariqueahmad108-ship-it/jwtpeek/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
