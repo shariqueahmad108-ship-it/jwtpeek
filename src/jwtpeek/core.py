@@ -45,6 +45,18 @@ class Inspection:
     findings: list[Finding] = field(default_factory=list)
 
 
+# Severity levels, ordered least to most severe.
+SEVERITY_ORDER = ("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL")
+
+
+def severity_rank(severity: str) -> int:
+    """Rank of a severity (0 = INFO … 4 = CRITICAL); -1 if unknown."""
+    try:
+        return SEVERITY_ORDER.index(severity)
+    except ValueError:
+        return -1
+
+
 def _b64url_decode(segment: str) -> bytes:
     """Decode a base64url segment, restoring any stripped ``=`` padding."""
     padding = "=" * (-len(segment) % 4)

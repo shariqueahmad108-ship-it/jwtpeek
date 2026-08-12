@@ -41,3 +41,22 @@ def test_token_argument_still_works(capsys):
 
     assert "Findings:" in capsys.readouterr().out
     assert rc == 0  # clean token, no critical/high
+
+
+def test_min_severity_filters_below_threshold(capsys):
+    # alg=none -> alg-none (CRITICAL); no exp -> no-exp (MEDIUM)
+    tok = _token({"alg": "none"}, {"sub": "1"})
+    rc = cli.main([tok, "--min-severity", "CRITICAL"])
+    out = capsys.readouterr().out
+    assert "alg-none" in out
+    assert "no-exp" not in out   # MEDIUM finding filtered out
+    assert rc == 1              # a CRITICAL is still shown -> gate fails
+
+
+def test_min_severity_hides_everything_below_high(capsys):
+    # HS256 + valid exp -> only an INFO finding; --min-severity HIGH hides it
+    tok = _token({"alg": "HS256"}, {"sub": "1", "exp": int(time.time()) + 3600})
+    rc = cli.main([tok, "--min-severity", "HIGH"])
+    out = capsys.readouterr().out
+    assert "Findings:\n  none" in out
+    assert rc == 0

@@ -22,8 +22,9 @@ pip install -e ".[dev]"
 
 ```bash
 jwtpeek <token>
-jwtpeek <token> --json     # machine-readable output
-echo "<token>" | jwtpeek - # read the token from stdin
+jwtpeek <token> --json                 # machine-readable output
+echo "<token>" | jwtpeek -             # read the token from stdin
+jwtpeek <token> --min-severity HIGH    # only show HIGH/CRITICAL (CI gate)
 ```
 
 Example:

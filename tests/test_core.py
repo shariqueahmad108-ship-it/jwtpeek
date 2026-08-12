@@ -113,3 +113,9 @@ def test_rejects_non_base64_segment():
 
 def test_decode_segment_restores_padding():
     assert decode_segment(_seg({"a": 1})) == {"a": 1}
+
+
+def test_severity_rank_orders_levels():
+    from jwtpeek.core import severity_rank
+    assert severity_rank("INFO") < severity_rank("MEDIUM") < severity_rank("HIGH") < severity_rank("CRITICAL")
+    assert severity_rank("bogus") == -1
