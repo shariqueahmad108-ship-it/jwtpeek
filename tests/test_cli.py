@@ -97,3 +97,12 @@ def test_no_token_and_no_batch_errors():
     import pytest
     with pytest.raises(SystemExit):
         cli.main([])
+
+
+def test_version_flag_prints_version(capsys):
+    import pytest
+    from jwtpeek import __version__
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--version"])
+    assert exc.value.code == 0
+    assert __version__ in capsys.readouterr().out

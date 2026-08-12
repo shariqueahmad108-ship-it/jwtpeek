@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 
+from jwtpeek import __version__
 from jwtpeek.core import SEVERITY_ORDER, Inspection, inspect, severity_rank
 
 
@@ -80,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="jwtpeek",
         description="Decode and security-inspect a JWT without verifying its signature.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "token",
         nargs="?",
