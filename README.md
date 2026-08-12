@@ -25,6 +25,7 @@ jwtpeek <token>
 jwtpeek <token> --json                 # machine-readable output
 echo "<token>" | jwtpeek -             # read the token from stdin
 jwtpeek <token> --min-severity HIGH    # only show HIGH/CRITICAL (CI gate)
+jwtpeek --batch tokens.txt             # inspect a file of tokens, one per line
 ```
 
 Example:
