@@ -58,6 +58,10 @@ scripts/CI), `2` on a malformed token, and `0` otherwise.
 | `header-jwk` | HIGH | header embeds a public key — forgeable if the server verifies against it |
 | `header-x5c` | MEDIUM | header embeds an X.509 cert chain — review whether it's trusted |
 | `header-kid` | LOW | `kid` is attacker-controlled — path-traversal / SQLi if used unsafely for key lookup |
+| `header-crit` | MEDIUM | `crit` marks extension params the verifier must enforce — ignored `crit` is a known bypass |
+| `header-crit-invalid` | HIGH | `crit` is malformed per RFC 7515 (not a list, empty, or names a registered/absent param) — tampering signal |
+| `jwe-encrypted` | INFO | token is a 5-segment JWE (encrypted); claims are ciphertext and not inspectable without the key |
+| `jwe-weak-alg` | HIGH | JWE key management is `RSA1_5` (RSAES-PKCS1-v1_5) — Bleichenbacher / padding-oracle risk |
 | `no-exp` | MEDIUM | no `exp` claim — token never expires |
 | `expired` | LOW | `exp` is in the past |
 | `long-lived` | LOW | `exp` is more than a year out |

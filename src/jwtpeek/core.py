@@ -30,6 +30,22 @@ _KEY_SOURCE_HEADERS = {
     "x5c": ("MEDIUM", "embeds an X.509 cert chain the server may verify against — review whether it is trusted."),
 }
 
+# Header parameters registered by RFC 7515 / JWA. A 'crit' list must name only
+# *extension* params (and each must actually be present in the header), so any of
+# these appearing in 'crit' is a spec violation and a tampering signal.
+_RESERVED_CRIT_NAMES = {
+    "alg", "jku", "jwk", "kid", "x5u", "x5c", "x5t", "x5t#S256", "typ", "cty", "crit",
+}
+
+# JWE (encrypted token) key-management algorithms with known weaknesses.
+_RSA1_5_DETAIL = (
+    "key management is RSAES-PKCS1-v1_5 (RSA1_5), vulnerable to Bleichenbacher / "
+    "million-message padding-oracle attacks; RSA-OAEP should be used instead."
+)
+_JWE_RISKY_ALGS = {
+    "RSA1_5": ("HIGH", _RSA1_5_DETAIL),
+}
+
 
 @dataclass
 class Finding:
@@ -78,21 +94,50 @@ def decode_segment(segment: str) -> dict[str, Any]:
     return obj
 
 
+def _inspect_jwe(parts: list[str]) -> Inspection:
+    """Inspect a 5-segment JWE (encrypted token).
+
+    A JWE's payload is ciphertext, so its claims cannot be read without the
+    decryption key. We still decode the (cleartext) JOSE header and surface the
+    key-management (``alg``) and content-encryption (``enc``) algorithms, which
+    are the useful triage signals for an encrypted token.
+    """
+    header = decode_segment(parts[0])
+    alg = str(header.get("alg", "")).strip()
+    enc = str(header.get("enc", "")).strip()
+    findings: list[Finding] = [
+        Finding(
+            "INFO",
+            "jwe-encrypted",
+            f"This is a JWE (encrypted, 5 segments), not a signed JWS: the payload is ciphertext and its "
+            f"claims cannot be inspected without the decryption key (alg={alg or '?'}, enc={enc or '?'}).",
+        )
+    ]
+    risky = _JWE_RISKY_ALGS.get(alg)
+    if risky:
+        severity, detail = risky
+        findings.append(Finding(severity, "jwe-weak-alg", f"JWE {detail}"))
+    return Inspection(header=header, payload={}, findings=findings)
+
+
 def inspect(token: str, now: int | None = None) -> Inspection:
     """Decode a JWT (without verifying its signature) and flag security issues.
 
     Args:
-        token: the compact JWT string (``header.payload.signature``).
+        token: the compact JWT string — a 3-segment JWS (``header.payload.signature``)
+            or a 5-segment JWE (encrypted; only its header is inspectable).
         now: unix timestamp used for expiry checks; defaults to the current time
             (injectable so tests are deterministic).
 
     Raises:
-        ValueError: if the token is not three base64url/JSON segments.
+        ValueError: if the token is not a 3-segment JWS or a 5-segment JWE.
     """
     now = int(time.time()) if now is None else now
     parts = token.strip().split(".")
+    if len(parts) == 5:
+        return _inspect_jwe(parts)
     if len(parts) != 3:
-        raise ValueError(f"expected 3 dot-separated segments, got {len(parts)}")
+        raise ValueError(f"expected a 3-segment JWS or 5-segment JWE, got {len(parts)} segments")
 
     header = decode_segment(parts[0])
     payload = decode_segment(parts[1])
@@ -147,6 +192,39 @@ def inspect(token: str, now: int | None = None) -> Inspection:
                 "path traversal or SQL injection.",
             )
         )
+
+    if "crit" in header:
+        crit = header.get("crit")
+        problems: list[str] = []
+        if not isinstance(crit, list) or not crit:
+            problems.append("must be a non-empty array of strings")
+        elif not all(isinstance(name, str) for name in crit):
+            problems.append("every entry must be a string")
+        else:
+            for name in crit:
+                if name in _RESERVED_CRIT_NAMES:
+                    problems.append(f"names the registered header '{name}'")
+                elif name not in header:
+                    problems.append(f"names '{name}', which is absent from the header")
+        if problems:
+            findings.append(
+                Finding(
+                    "HIGH",
+                    "header-crit-invalid",
+                    "Header 'crit' violates RFC 7515 (" + "; ".join(problems) + "): a verifier that "
+                    "does not reject this can be bypassed, and a malformed crit list is a tampering signal.",
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    "MEDIUM",
+                    "header-crit",
+                    "Header 'crit' marks extension params the verifier MUST understand and process; "
+                    "confirm the server enforces every listed param — ignored 'crit' extensions are a "
+                    "known validation-bypass vector.",
+                )
+            )
 
     if "exp" not in payload:
         findings.append(

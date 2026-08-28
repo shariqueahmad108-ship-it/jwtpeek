@@ -82,6 +82,40 @@ def test_flags_kid_header():
     assert "header-kid" in codes
 
 
+def test_flags_valid_crit_as_medium():
+    # A well-formed crit naming a present extension param is reported at MEDIUM.
+    tok = _token({"alg": "RS256", "b64": False, "crit": ["b64"]}, {"exp": int(time.time()) + 3600})
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("header-crit") == "MEDIUM"
+    assert "header-crit-invalid" not in codes
+
+
+def test_flags_crit_not_a_list_as_invalid():
+    tok = _token({"alg": "RS256", "crit": "b64"}, {"exp": int(time.time()) + 3600})
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("header-crit-invalid") == "HIGH"
+    assert "header-crit" not in codes
+
+
+def test_flags_empty_crit_as_invalid():
+    tok = _token({"alg": "RS256", "crit": []}, {"exp": int(time.time()) + 3600})
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("header-crit-invalid") == "HIGH"
+
+
+def test_flags_crit_naming_registered_header_as_invalid():
+    tok = _token({"alg": "RS256", "crit": ["alg"]}, {"exp": int(time.time()) + 3600})
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("header-crit-invalid") == "HIGH"
+
+
+def test_flags_crit_naming_absent_param_as_invalid():
+    # crit names an extension param that is not present in the header — an RFC 7515 violation.
+    tok = _token({"alg": "RS256", "crit": ["dpop+ext"]}, {"exp": int(time.time()) + 3600})
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("header-crit-invalid") == "HIGH"
+
+
 def test_flags_not_yet_valid_nbf():
     now = 1_000_000
     tok = _token({"alg": "RS256"}, {"exp": now + 3600, "nbf": now + 600})
@@ -102,8 +136,27 @@ def test_valid_rs256_token_has_no_findings():
 
 
 def test_rejects_wrong_segment_count():
-    with pytest.raises(ValueError, match="3 dot-separated"):
+    with pytest.raises(ValueError, match="3-segment JWS or 5-segment JWE"):
         inspect("only.two")
+
+
+def test_jwe_five_segments_reported_as_encrypted():
+    # A 5-segment JWE: header . encrypted_key . iv . ciphertext . tag
+    header = _seg({"alg": "RSA-OAEP", "enc": "A256GCM"})
+    tok = f"{header}.encrypted_key.iv.ciphertext.tag"
+    result = inspect(tok)
+    codes = {f.code: f.severity for f in result.findings}
+    assert codes.get("jwe-encrypted") == "INFO"
+    assert result.header["enc"] == "A256GCM"
+    assert result.payload == {}  # claims are ciphertext, not inspectable
+
+
+def test_jwe_rsa1_5_key_management_flagged():
+    header = _seg({"alg": "RSA1_5", "enc": "A128CBC-HS256"})
+    tok = f"{header}.ek.iv.ct.tag"
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("jwe-weak-alg") == "HIGH"
+    assert codes.get("jwe-encrypted") == "INFO"
 
 
 def test_rejects_non_base64_segment():
