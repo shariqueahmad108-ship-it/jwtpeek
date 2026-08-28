@@ -159,6 +159,29 @@ def test_jwe_rsa1_5_key_management_flagged():
     assert codes.get("jwe-encrypted") == "INFO"
 
 
+def test_b64_false_unencoded_payload_flagged_without_crashing():
+    # RFC 7797: b64=false, payload is raw (not base64url). Properly listed in crit.
+    header = _seg({"alg": "HS256", "b64": False, "crit": ["b64"]})
+    tok = f'{header}.{{"sub":"1"}}.sig'
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("b64-false") == "MEDIUM"
+    assert "b64-not-critical" not in codes  # b64 IS in crit here
+
+
+def test_b64_false_not_in_crit_is_high():
+    header = _seg({"alg": "HS256", "b64": False})  # b64 set but not marked critical
+    tok = f'{header}.{{"sub":"1"}}.sig'
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("b64-not-critical") == "HIGH"
+
+
+def test_b64_false_non_json_payload_yields_empty_claims():
+    header = _seg({"alg": "HS256", "b64": False, "crit": ["b64"]})
+    tok = f"{header}.this-is-detached-content.sig"
+    result = inspect(tok)
+    assert result.payload == {}  # unencoded payload isn't JSON — no crash, empty claims
+
+
 def test_rejects_non_base64_segment():
     with pytest.raises(ValueError):
         inspect("@@@.@@@.sig")

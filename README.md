@@ -62,6 +62,8 @@ scripts/CI), `2` on a malformed token, and `0` otherwise.
 | `header-crit-invalid` | HIGH | `crit` is malformed per RFC 7515 (not a list, empty, or names a registered/absent param) — tampering signal |
 | `jwe-encrypted` | INFO | token is a 5-segment JWE (encrypted); claims are ciphertext and not inspectable without the key |
 | `jwe-weak-alg` | HIGH | JWE key management is `RSA1_5` (RSAES-PKCS1-v1_5) — Bleichenbacher / padding-oracle risk |
+| `b64-false` | MEDIUM | `b64:false` (RFC 7797 unencoded payload) — verifiers that mishandle it can accept a mismatched payload |
+| `b64-not-critical` | HIGH | `b64` is set but not listed in `crit`, which RFC 7797 requires |
 | `no-exp` | MEDIUM | no `exp` claim — token never expires |
 | `expired` | LOW | `exp` is in the past |
 | `long-lived` | LOW | `exp` is more than a year out |

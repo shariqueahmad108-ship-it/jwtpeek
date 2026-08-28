@@ -94,6 +94,20 @@ def decode_segment(segment: str) -> dict[str, Any]:
     return obj
 
 
+def _decode_unencoded_payload(segment: str) -> dict[str, Any]:
+    """Best-effort decode of an RFC 7797 (``b64:false``) unencoded payload.
+
+    With ``b64:false`` the payload segment is raw, not base64url-encoded. It is
+    often not JSON at all (RFC 7797 targets detached/arbitrary content), so this
+    returns the parsed object when it happens to be a JSON object, else ``{}``.
+    """
+    try:
+        obj = json.loads(segment)
+    except (json.JSONDecodeError, ValueError):
+        return {}
+    return obj if isinstance(obj, dict) else {}
+
+
 def _inspect_jwe(parts: list[str]) -> Inspection:
     """Inspect a 5-segment JWE (encrypted token).
 
@@ -140,8 +154,32 @@ def inspect(token: str, now: int | None = None) -> Inspection:
         raise ValueError(f"expected a 3-segment JWS or 5-segment JWE, got {len(parts)} segments")
 
     header = decode_segment(parts[0])
-    payload = decode_segment(parts[1])
     findings: list[Finding] = []
+
+    # RFC 7797: b64=false means the payload segment is NOT base64url-encoded.
+    if header.get("b64") is False:
+        findings.append(
+            Finding(
+                "MEDIUM",
+                "b64-false",
+                "Header 'b64' is false (RFC 7797 unencoded payload): the payload segment is not "
+                "base64url-encoded. Verifiers that do not implement RFC 7797 consistently can be "
+                "confused into accepting a payload other than the one that was signed.",
+            )
+        )
+        crit = header.get("crit")
+        if not (isinstance(crit, list) and "b64" in crit):
+            findings.append(
+                Finding(
+                    "HIGH",
+                    "b64-not-critical",
+                    "'b64' is set but not listed in 'crit': RFC 7797 requires b64 to be critical. A "
+                    "verifier that ignores it will base64url-decode the payload, diverging from the signer.",
+                )
+            )
+        payload = _decode_unencoded_payload(parts[1])
+    else:
+        payload = decode_segment(parts[1])
 
     if parts[2] == "":
         findings.append(
