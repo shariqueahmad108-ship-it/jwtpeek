@@ -64,6 +64,7 @@ scripts/CI), `2` on a malformed token, and `0` otherwise.
 | `jwe-weak-alg` | HIGH | JWE key management is `RSA1_5` (RSAES-PKCS1-v1_5) — Bleichenbacher / padding-oracle risk |
 | `b64-false` | MEDIUM | `b64:false` (RFC 7797 unencoded payload) — verifiers that mishandle it can accept a mismatched payload |
 | `b64-not-critical` | HIGH | `b64` is set but not listed in `crit`, which RFC 7797 requires |
+| `nested-jwt` | LOW | `cty:JWT` — the payload is a nested JWT/JWE; the real claims are one layer deeper |
 | `no-exp` | MEDIUM | no `exp` claim — token never expires |
 | `expired` | LOW | `exp` is in the past |
 | `long-lived` | LOW | `exp` is more than a year out |

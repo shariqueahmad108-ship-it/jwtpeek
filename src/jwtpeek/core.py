@@ -156,8 +156,21 @@ def inspect(token: str, now: int | None = None) -> Inspection:
     header = decode_segment(parts[0])
     findings: list[Finding] = []
 
+    # RFC 7519 5.2: cty=JWT means the payload is itself a (nested) JWT/JWE, not
+    # the final claims — so it is another token string, not a JSON object.
+    nested = str(header.get("cty", "")).strip().lower() in ("jwt", "application/jwt")
+    if nested:
+        findings.append(
+            Finding(
+                "LOW",
+                "nested-jwt",
+                "Header 'cty' is JWT: the payload is itself a nested JWT/JWE, not the final claims. "
+                "Inspect the inner token separately — its own header can downgrade 'alg' or embed a key.",
+            )
+        )
+        payload: dict[str, Any] = {}
     # RFC 7797: b64=false means the payload segment is NOT base64url-encoded.
-    if header.get("b64") is False:
+    elif header.get("b64") is False:
         findings.append(
             Finding(
                 "MEDIUM",
@@ -264,26 +277,29 @@ def inspect(token: str, now: int | None = None) -> Inspection:
                 )
             )
 
-    if "exp" not in payload:
-        findings.append(
-            Finding("MEDIUM", "no-exp", "Payload has no 'exp' claim: the token never expires.")
-        )
-    else:
-        exp = payload.get("exp")
-        if isinstance(exp, (int, float)) and not isinstance(exp, bool):
-            if exp < now:
-                findings.append(
-                    Finding("LOW", "expired", f"Token is expired (exp={int(exp)}, now={now}).")
-                )
-            elif exp - now > LONG_LIVED_SECONDS:
-                days = int((exp - now) / 86400)
-                findings.append(
-                    Finding("LOW", "long-lived", f"Token is long-lived (~{days} days until exp).")
-                )
-        else:
+    # Claim (payload) checks only apply to a real claims set — skip them for a
+    # nested token, whose claims live one layer deeper in the inner JWT.
+    if not nested:
+        if "exp" not in payload:
             findings.append(
-                Finding("LOW", "exp-not-numeric", "'exp' is present but not a numeric timestamp.")
+                Finding("MEDIUM", "no-exp", "Payload has no 'exp' claim: the token never expires.")
             )
+        else:
+            exp = payload.get("exp")
+            if isinstance(exp, (int, float)) and not isinstance(exp, bool):
+                if exp < now:
+                    findings.append(
+                        Finding("LOW", "expired", f"Token is expired (exp={int(exp)}, now={now}).")
+                    )
+                elif exp - now > LONG_LIVED_SECONDS:
+                    days = int((exp - now) / 86400)
+                    findings.append(
+                        Finding("LOW", "long-lived", f"Token is long-lived (~{days} days until exp).")
+                    )
+            else:
+                findings.append(
+                    Finding("LOW", "exp-not-numeric", "'exp' is present but not a numeric timestamp.")
+                )
 
     nbf = payload.get("nbf")
     if isinstance(nbf, (int, float)) and not isinstance(nbf, bool) and nbf > now:

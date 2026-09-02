@@ -12,6 +12,10 @@ def _seg(obj) -> str:
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
+def _seg_str(text: str) -> str:
+    return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
+
+
 def _token(header, payload) -> str:
     return f"{_seg(header)}.{_seg(payload)}.sig"
 
@@ -180,6 +184,24 @@ def test_b64_false_non_json_payload_yields_empty_claims():
     tok = f"{header}.this-is-detached-content.sig"
     result = inspect(tok)
     assert result.payload == {}  # unencoded payload isn't JSON — no crash, empty claims
+
+
+def test_nested_jwt_cty_is_flagged_without_crashing():
+    # cty=JWT: the payload is itself a JWT string (not JSON claims). Must not crash.
+    inner = f"{_seg({'alg': 'HS256'})}.{_seg({'sub': '1'})}.sig"
+    outer_header = _seg({"alg": "HS256", "cty": "JWT"})
+    tok = f"{outer_header}.{_seg_str(inner)}.sig"
+    codes = {f.code: f.severity for f in inspect(tok).findings}
+    assert codes.get("nested-jwt") == "LOW"
+    # the misleading 'no-exp' claim finding must be suppressed for a nested token
+    assert "no-exp" not in codes
+
+
+def test_nested_jwt_application_jwt_content_type():
+    outer_header = _seg({"alg": "RS256", "cty": "application/jwt"})
+    tok = f"{outer_header}.{_seg_str('eyJ.inner.token')}.sig"
+    codes = {f.code for f in inspect(tok).findings}
+    assert "nested-jwt" in codes
 
 
 def test_rejects_non_base64_segment():
