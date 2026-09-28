@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jwtpeek"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Decode and security-inspect JSON Web Tokens without verifying signatures."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -26,3 +26,6 @@ jwtpeek = "jwtpeek.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "jwtpeek.__version__" }
