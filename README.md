@@ -14,7 +14,21 @@ token is built* — before you ever trust its contents.
 
 ## Install
 
+Install it straight from GitHub:
+
 ```bash
+pipx install git+https://github.com/shariqueahmad108-ship-it/jwtpeek.git
+# or, into the current environment
+pip install git+https://github.com/shariqueahmad108-ship-it/jwtpeek.git
+```
+
+> Don't `pip install jwtpeek`: that name on PyPI belongs to a different, unrelated project.
+
+For development:
+
+```bash
+git clone https://github.com/shariqueahmad108-ship-it/jwtpeek.git
+cd jwtpeek
 pip install -e ".[dev]"
 ```
 
